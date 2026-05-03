@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>百度键盘前景字幕生成器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;background:#0a0a14;color:#ddd;min-height:100vh}
+.wrap{max-width:920px;margin:0 auto;padding:14px}
+header{text-align:center;padding:20px 0 10px}
+header h1{font-size:22px;background:linear-gradient(135deg,#6ee7b7,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header p{font-size:12px;color:#666;margin-top:4px}
+.tag{display:inline-block;background:#6366f1;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;vertical-align:middle}
+
+/* Upload */
+.upload{border:2px dashed #333;border-radius:16px;padding:54px 20px;text-align:center;cursor:pointer;transition:.3s}
+.upload:hover,.upload.over{border-color:#818cf8;background:rgba(129,140,248,.06)}
+.upload .ic{font-size:44px;margin-bottom:8px}
+.upload p{color:#999;font-size:14px}
+.upload small{color:#555;font-size:11px}
+#fileIn{display:none}
+
+/* Progress */
+.prog{text-align:center;padding:50px 0;display:none}
+.prog-bar-wrap{width:260px;height:6px;background:#1e1e30;border-radius:3px;margin:14px auto 10px;overflow:hidden}
+.prog-bar{height:100%;width:0%;background:linear-gradient(90deg,#818cf8,#6ee7b7);border-radius:3px;transition:width .3s}
+.prog .msg{font-size:13px;color:#888}
+
+/* Main */
+#main{display:none}
+.info{background:#111827;border-left:3px solid #818cf8;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#94a3b8;line-height:1.7}
+
+/* Preview */
+.prev-sec h2{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.prev-wrap{display:flex;justify-content:center;background:#111;border-radius:12px;padding:12px;overflow-x:auto}
+.prev-box{position:relative;max-width:420px;width:100%;border:1px solid #333;border-radius:6px;overflow:hidden;background:repeating-conic-gradient(#1a1a1a 0% 25%,#222 0% 50%) 0 0/16px 16px}
+.prev-box canvas{display:block;width:100%;height:auto}
+.prev-box .overlay{position:absolute;top:0;left:0;pointer-events:none}
+.leg{display:flex;gap:14px;margin:6px 0;font-size:11px;color:#777}
+.leg .d{width:9px;height:9px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:3px}
+
+/* Controls */
+.ctrl-sec{margin:18px 0}
+.ctrl-sec h2{font-size:15px;margin-bottom:10px}
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:580px){.ctrl-grid{grid-template-columns:1fr}}
+.ci{background:#111827;border-radius:10px;padding:12px}
+.ci label{font-size:11px;color:#888;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.ci label b{color:#818cf8;font-weight:600;font-size:12px}
+.ci input[type=range]{width:100%;accent-color:#818cf8;height:5px}
+.ci input[type=color]{width:100%;height:32px;border:none;border-radius:6px;cursor:pointer;background:none}
+.ci select{width:100%;padding:7px;border:1px solid #2a2a40;border-radius:6px;background:#0a0a14;color:#ccc;font-size:12px}
+.ci-row{display:flex;gap:6px;align-items:center}
+.ci-row .rb{background:#1e1e30;border:none;color:#888;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px}
+.ci-row .rb:hover{color:#fff;background:#333}
+
+/* ===== Font Import Section ===== */
+.font-sec{margin:18px 0}
+.font-sec h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.font-box{background:#111827;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.font-methods{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:580px){.font-methods{grid-template-columns:1fr}}
+.fm-card{background:#0f0f1a;border:1px dashed #2a2a40;border-radius:10px;padding:14px;text-align:center;transition:.2s;cursor:pointer}
+.fm-card:hover{border-color:#818cf8;background:rgba(129,140,248,.04)}
+.fm-card .fm-ic{font-size:28px;margin-bottom:6px}
+.fm-card .fm-title{font-size:13px;color:#ccc;font-weight:600;margin-bottom:3px}
+.fm-card .fm-desc{font-size:10px;color:#666}
+.fm-url-row{display:flex;gap:8px}
+.fm-url-row input{flex:1;padding:9px 12px;border:1px solid #2a2a40;border-radius:8px;background:#0a0a14;color:#ccc;font-size:12px;outline:none}
+.fm-url-row input:focus{border-color:#818cf8}
+.fm-url-row input::placeholder{color:#444}
+.fm-url-row button{padding:9px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#818cf8,#6366f1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.2s}
+.fm-url-row button:hover{box-shadow:0 2px 12px rgba(99,102,241,.4)}
+.fm-url-row button:disabled{opacity:.5;cursor:not-allowed}
+#fontFileIn{display:none}
+
+/* Font list */
+.font-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:24px}
+.font-tag{display:inline-flex;align-items:center;gap:5px;background:#1e1e30;border:1px solid #2a2a40;border-radius:6px;padding:4px 10px;font-size:11px;color:#aaa;transition:.2s}
+.font-tag:hover{border-color:#818cf8}
+.font-tag .ft-name{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.font-tag .ft-preview{color:#818cf8;font-size:13px}
+.font-tag .ft-del{background:none;border:none;color:#555;cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
+.font-tag .ft-del:hover{color:#ef4444}
+.font-loading{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#818cf8}
+.font-loading .mini-spin{width:14px;height:14px;border:2px solid #333;border-top-color:#818cf8;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.font-err{font-size:11px;color:#ef4444;margin-top:4px}
+.font-hint{font-size:10px;color:#555;margin-top:2px}
+
+/* Key Inputs */
+.inp-sec{margin:18px 0}
+.inp-sec h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:7px}
+.ki{background:#111827;border-radius:8px;padding:8px;text-align:center;border:1px solid #1e1e30;transition:.2s}
+.ki:hover{border-color:#818cf8}
+.ki .kn{font-size:9px;color:#555;margin-bottom:3px}
+.ki input{width:100%;border:1px solid #222;background:#0a0a14;color:#fff;text-align:center;padding:5px 3px;border-radius:4px;font-size:13px;outline:none}
+.ki input:focus{border-color:#818cf8}
+.ki.active{border-color:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.2)}
+
+/* Actions */
+.acts{display:flex;gap:10px;justify-content:center;margin:22px 0;flex-wrap:wrap}
+.btn{padding:11px 26px;border-radius:10px;border:none;font-size:13px;cursor:pointer;font-weight:600;transition:.2s}
+.btn1{background:linear-gradient(135deg,#818cf8,#6366f1);color:#fff}
+.btn1:hover{box-shadow:0 4px 18px rgba(99,102,241,.4);transform:translateY(-1px)}
+.btn2{background:#1e293b;color:#aaa}
+.btn2:hover{background:#263040;color:#fff}
+.btn3{background:#dc2626;color:#fff}
+.btn3:hover{background:#b91c1c}
+
+.stat{text-align:center;font-size:11px;color:#555;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⌨️ 百度键盘前景字幕生成器</h1>
+    <p>上传键盘皮肤/截图 → 自动提取实体按键 → 编辑文字 → 导出 PNG</p>
+  </header>
+
+  <!-- Upload -->
+  <div class="upload" id="uploadZone">
+    <input type="file" id="fileIn" accept="image/*">
+    <div class="ic"></div>
+    <p>点击或拖拽上传键盘图片</p>
+    <small>支持 PNG（透明底自动提取实体）/ JPG（边缘检测）</small>
+  </div>
+
+  <!-- Progress -->
+  <div class="prog" id="prog">
+    <div style="font-size:36px;margin-bottom:6px"></div>
+    <div class="prog-bar-wrap"><div class="prog-bar" id="progBar"></div></div>
+    <div class="msg" id="progMsg">准备中...</div>
+  </div>
+
+  <!-- ========== Main ========== -->
+  <div id="main">
+    <div class="info" id="infoBar">
+       预览已限制为 vivo X100 宽度（420px）。检测到 <b id="infoCount">0</b> 个实体区域。所有文字为同一图层，导出为透明 PNG。
+    </div>
+
+    <!-- Preview -->
+    <section class="prev-sec">
+      <h2>预览 <span class="tag">420px · vivo X100</span></h2>
+      <div class="leg">
+        <span><span class="d" style="background:#818cf8"></span>检测区域</span>
+        <span><span class="d" style="background:#fff"></span>文字图层</span>
+      </div>
+      <div class="prev-wrap">
+        <div class="prev-box" id="prevBox">
+          <canvas id="bgC"></canvas>
+          <canvas id="hlC" class="overlay"></canvas>
+          <canvas id="txC" class="overlay"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Font Import ===== -->
+    <section class="font-sec">
+      <h2> 自定义字体 <span class="tag">TTF / URL</span></h2>
+      <div class="font-box">
+        <div class="font-methods">
+          <!-- File upload card -->
+          <div class="fm-card" id="fontFileCard">
+            <input type="file" id="fontFileIn" accept=".ttf,.otf,.woff,.woff2">
+            <div class="fm-ic"></div>
+            <div class="fm-title">上传字体文件</div>
+            <div class="fm-desc">支持 .ttf .otf .woff .woff2</div>
+          </div>
+          <!-- URL card -->
+          <div class="fm-card" id="fontUrlCard" style="cursor:default">
+            <div class="fm-ic"></div>
+            <div class="fm-title">从 URL 加载</div>
+            <div class="fm-desc">输入字体文件的在线地址</div>
+          </div>
+        </div>
+
+        <!-- URL input row -->
+        <div class="fm-url-row">
+          <input type="text" id="fontUrlInput" placeholder="https://example.com/font.ttf 或 CSS @font-face URL">
+          <button id="fontUrlBtn">加载字体</button>
+        </div>
+
+        <!-- Font name (optional) -->
+        <div class="fm-url-row">
+          <input type="text" id="fontNameInput" placeholder="自定义字体名称（可选，留空自动命名）" style="flex:2">
+        </div>
+
+        <!-- Status -->
+        <div id="fontStatus"></div>
+
+        <!-- Loaded fonts list -->
+        <div>
+          <div style="font-size:11px;color:#666;margin-bottom:4px">已加载的自定义字体：</div>
+          <div class="font-list" id="fontList">
+            <span style="font-size:11px;color:#444">暂无自定义字体</span>
+          </div>
+        </div>
+
+        <div class="font-hint"> 导出 PNG 时自定义字体会自动生效。字体会自动保存到本地，重启不丢失。推荐使用免费商用字体（如思源黑体、霞鹜文楷等）。</div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="ctrl-sec">
+      <h2> 文字图层控制</h2>
+      <div class="ctrl-grid">
+        <div class="ci">
+          <label>X 偏移 <b id="xV">0</b></label>
+          <div class="ci-row">
+            <input type="range" id="ox" min="-300" max="300" value="0">
+            <button class="rb" onclick="rst('ox')">0</button>
+          </div>
+        </div>
+        <div class="ci">
+          <label>Y 偏移 <b id="yV">0</b></label>
+          <div class="ci-row">
+            <input type="range" id="oy" min="-300" max="300" value="0">
+            <button class="rb" onclick="rst('oy')">0</button>
+          </div>
+        </div>
+        <div class="ci">
+          <label>字号 <b id="fV">10</b></label>
+          <input type="range" id="fs" min="1" max="20" value="10">
+        </div>
+        <div class="ci">
+          <label>颜色</label>
+          <input type="color" id="fc" value="#ffffff">
+        </div>
+        <div class="ci">
+          <label>粗细</label>
+          <select id="fw">
+            <option value="100">极细</option>
+            <option value="300">细体</option>
+            <option value="normal">常规</option>
+            <option value="bold" selected>粗体</option>
+            <option value="900">极粗</option>
+          </select>
+        </div>
+        <div class="ci">
+          <label>字体</label>
+          <select id="ff">
+            <option value="sans-serif">默认无衬线</option>
+            <option value="serif">衬线体</option>
+            <option value="monospace">等宽体</option>
+            <option value="'PingFang SC',sans-serif">苹方</option>
+            <option value="'Microsoft YaHei',sans-serif">微软雅黑</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key Inputs -->
+    <section class="inp-sec">
+      <h2>✏️ 文字编辑 <span class="tag" id="kcnt">0 个</span></h2>
+      <div class="keys" id="kgrid"></div>
+    </section>
+
+    <!-- Actions -->
+    <div class="acts">
+      <button class="btn btn1" id="expA"> 导出透明文字图层 PNG</button>
+      <button class="btn btn2" id="expB">️ 导出带背景预览</button>
+      <button class="btn btn3" id="rstBtn"> 重新上传</button>
+    </div>
+    <div class="stat" id="stat"></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// Worker (inline blob)
+// ================================================================
+const WORKER_CODE = `
+'use strict';
+self.onmessage = function(e) {
+  var pixels = e.data.pixels;
+  var W = e.data.w;
+  var H = e.data.h;
+  var N = W * H;
+
+  post(5, '扫描透明通道...');
+  var alphaCount = 0;
+  for (var i = 0; i < N; i++) {
+    if (pixels[i * 4 + 3] < 25) alphaCount++;
+  }
+  var hasAlpha = (alphaCount / N) > 0.08;
+
+  post(15, hasAlpha ? '检测非透明实体...' : '边缘检测...');
+  var binary = new Uint8Array(N);
+
+  if (hasAlpha) {
+    for (var i = 0; i < N; i++) {
+      binary[i] = pixels[i * 4 + 3] > 25 ? 1 : 0;
+    }
+    for (var pass = 0; pass < 2; pass++) {
+      var next = new Uint8Array(N);
+      for (var y = 1; y < H - 1; y++) {
+        for (var x = 1; x < W - 1; x++) {
+          var idx = y * W + x;
+          if (binary[idx] && binary[idx-1] && binary[idx+1] && binary[idx-W] && binary[idx+W]) next[idx] = 1;
+        }
+      }
+      binary = next;
+    }
+  } else {
+    var gray = new Float32Array(N);
+    for (var i = 0; i < N; i++) gray[i] = 0.299*pixels[i*4] + 0.587*pixels[i*4+1] + 0.114*pixels[i*4+2];
+    var grad = new Float32Array(N);
+    for (var y = 1; y < H-1; y++) {
+      for (var x = 1; x < W-1; x++) {
+        var idx = y*W+x;
+        var gx = gray[idx+1]-gray[idx-1];
+        var gy = gray[idx+W]-gray[idx-W];
+        grad[idx] = Math.sqrt(gx*gx+gy*gy);
+      }
+    }
+    var gs=0,gc=0;
+    for(var i=0;i<N;i++){if(grad[i]>0){gs+=grad[i];gc++;}}
+    var gm=gs/gc, gv=0;
+    for(var i=0;i<N;i++){if(grad[i]>0){var d=grad[i]-gm;gv+=d*d;}}
+    var gsd=Math.sqrt(gv/gc);
+    var thr=Math.max(gm*0.5,gm-gsd*0.3);
+    for(var i=0;i<N;i++) binary[i]=grad[i]<thr?1:0;
+    for(var p=0;p<3;p++){
+      var nxt=new Uint8Array(N);
+      for(var y=1;y<H-1;y++){for(var x=1;x<W-1;x++){
+        var idx=y*W+x;
+        if(binary[idx]&&binary[idx-1]&&binary[idx+1]&&binary[idx-W]&&binary[idx+W])nxt[idx]=1;
+      }}
+      binary=nxt;
+    }
+  }
+
+  post(40, '连通域标记...');
+  var labels = new Int32Array(N);
+  var lbl = 0;
+  var comps = [];
+  for (var y = 0; y < H; y++) {
+    for (var x = 0; x < W; x++) {
+      var idx = y * W + x;
+      if (binary[idx] === 1 && labels[idx] === 0) {
+        lbl++;
+        var q = [idx]; var f = 0;
+        labels[idx] = lbl;
+        var mnX=x,mxX=x,mnY=y,mxY=y,area=0;
+        while (f < q.length) {
+          var ci = q[f++];
+          var cx = ci % W;
+          var cy = (ci - cx) / W;
+          area++;
+          if(cx<mnX)mnX=cx;if(cx>mxX)mxX=cx;
+          if(cy<mnY)mnY=cy;if(cy>mxY)mxY=cy;
+          if(cx>0&&binary[ci-1]===1&&labels[ci-1]===0){labels[ci-1]=lbl;q.push(ci-1);}
+          if(cx<W-1&&binary[ci+1]===1&&labels[ci+1]===0){labels[ci+1]=lbl;q.push(ci+1);}
+          if(cy>0&&binary[ci-W]===1&&labels[ci-W]===0){labels[ci-W]=lbl;q.push(ci-W);}
+          if(cy<H-1&&binary[ci+W]===1&&labels[ci+W]===0){labels[ci+W]=lbl;q.push(ci+W);}
+        }
+        comps.push({minX:mnX,minY:mnY,maxX:mxX,maxY:mxY,area:area});
+      }
+    }
+  }
+
+  post(70, '筛选 (' + comps.length + ' 候选)...');
+  var total = W * H;
+  var filt = [];
+  for (var i = 0; i < comps.length; i++) {
+    var c = comps[i];
+    var cw = c.maxX-c.minX+1;
+    var ch = c.maxY-c.minY+1;
+    var ra = cw*ch;
+    var fill = c.area/ra;
+    var ar = ra/total;
+    var asp = cw/ch;
+    if (ar > 0.001 && ar < 0.12 && fill > 0.25 && cw > 4 && ch > 4 && asp > 0.15 && asp < 8) filt.push(c);
+  }
+
+  var dedup = [];
+  for (var i = 0; i < filt.length; i++) {
+    var c = filt[i], skip = false;
+    for (var j = 0; j < dedup.length; j++) {
+      var d = dedup[j];
+      var ox = Math.max(0, Math.min(c.maxX,d.maxX)-Math.max(c.minX,d.minX));
+      var oy = Math.max(0, Math.min(c.maxY,d.maxY)-Math.max(c.minY,d.minY));
+      if(ox*oy/((c.maxX-c.minX+1)*(c.maxY-c.minY+1))>0.5){skip=true;break;}
+    }
+    if(!skip) dedup.push(c);
+  }
+
+  post(85, '排序...');
+  var keys = dedup.map(function(c){
+    return {x:c.minX,y:c.minY,w:c.maxX-c.minX+1,h:c.maxY-c.minY+1,
+            cx:Math.round((c.minX+c.maxX)/2),cy:Math.round((c.minY+c.maxY)/2)};
+  });
+  if (keys.length > 1) {
+    keys.sort(function(a,b){return a.cy-b.cy;});
+    var avgH=0;for(var i=0;i<keys.length;i++)avgH+=keys[i].h;avgH/=keys.length;
+    var rowThr=avgH*0.45,rows=[],cur=[keys[0]];
+    for(var i=1;i<keys.length;i++){
+      if(Math.abs(keys[i].cy-cur[0].cy)<rowThr)cur.push(keys[i]);
+      else{rows.push(cur);cur=[keys[i]];}
+    }
+    rows.push(cur);keys=[];
+    for(var r=0;r<rows.length;r++){rows[r].sort(function(a,b){return a.cx-b.cx;});for(var c=0;c<rows[r].length;c++)keys.push(rows[r][c]);}
+  }
+  post(100, '完成！' + keys.length + ' 个实体');
+  self.postMessage({type:'done',keys:keys,mode:hasAlpha?'alpha':'edge'});
+};
+function post(p,m){self.postMessage({type:'progress',pct:p,msg:m});}
+`;
+
+// ================================================================
+// State
+// ================================================================
+let img = null, W = 0, H = 0;
+let keys = [], texts = [];
+let worker = null;
+let activeIdx = -1;
+let customFontCounter = 0;
+const customFonts = []; // {id, name, familyName, fontFace, base64}
+
+const $up = document.getElementById('uploadZone');
+const $fi = document.getElementById('fileIn');
+const $prog = document.getElementById('prog');
+const $pbar = document.getElementById('progBar');
+const $pmsg = document.getElementById('progMsg');
+const $main = document.getElementById('main');
+const $bgC = document.getElementById('bgC');
+const $hlC = document.getElementById('hlC');
+const $txC = document.getElementById('txC');
+const $kgrid = document.getElementById('kgrid');
+const $ff = document.getElementById('ff');
+
+// ================================================================
+// LocalStorage helpers for fonts
+// ================================================================
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function saveFontsToStorage() {
+  try {
+    const data = customFonts.map(f => ({
+      id: f.id,
+      name: f.name,
+      base64: f.base64
+    }));
+    localStorage.setItem('kbFonts', JSON.stringify(data));
+    localStorage.setItem('kbFontCounter', String(customFontCounter));
+  } catch (e) {
+    console.warn('字体保存到 localStorage 失败（可能超出容量）:', e.message);
+    showFontMsg('error', '字体保存到本地失败，可能超出浏览器存储限制');
+  }
+}
+
+async function loadFontsFromStorage() {
+  const raw = localStorage.getItem('kbFonts');
+  const savedCounter = localStorage.getItem('kbFontCounter');
+  if (savedCounter) customFontCounter = parseInt(savedCounter, 10) || 0;
+  if (!raw) return;
+
+  let data;
+  try { data = JSON.parse(raw); } catch { return; }
+  if (!Array.isArray(data) || data.length === 0) return;
+
+  for (const item of data) {
+    try {
+      const buffer = base64ToArrayBuffer(item.base64);
+      const familyName = `CustomFont_${item.id}`;
+      const ff = new FontFace(familyName, buffer);
+      const loadedFace = await ff.load();
+      document.fonts.add(loadedFace);
+
+      const fontEntry = {
+        id: item.id,
+        name: item.name,
+        familyName: familyName,
+        fontFace: loadedFace,
+        base64: item.base64
+      };
+      customFonts.push(fontEntry);
+      addFontOption(fontEntry);
+    } catch (e) {
+      console.warn(`恢复字体 "${item.name}" 失败:`, e.message);
+    }
+  }
+  refreshFontList();
+  if (customFonts.length > 0) {
+    showFontMsg('success', `✅ 已从本地恢复 ${customFonts.length} 个自定义字体`);
+  }
+}
+
+// ================================================================
+// Upload
+// ================================================================
+$up.addEventListener('click', () => $fi.click());
+$up.addEventListener('dragover', e => { e.preventDefault(); $up.classList.add('over'); });
+$up.addEventListener('dragleave', () => $up.classList.remove('over'));
+$up.addEventListener('drop', e => { e.preventDefault(); $up.classList.remove('over'); if(e.dataTransfer.files[0]) goImg(e.dataTransfer.files[0]); });
+$fi.addEventListener('change', e => { if(e.target.files[0]) goImg(e.target.files[0]); });
+
+function goImg(file) {
+  if (!file.type.startsWith('image/')) return alert('请上传图片');
+  const r = new FileReader();
+  r.onload = e => {
+    const im = new Image();
+    im.onload = () => { img = im; W = im.width; H = im.height; startDetect(); };
+    im.src = e.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+// ================================================================
+// Detection (Web Worker)
+// ================================================================
+function startDetect() {
+  $up.style.display = 'none';
+  $prog.style.display = 'block';
+  $pbar.style.width = '0%';
+  $pmsg.textContent = '正在初始化...';
+
+  const MAX = 600;
+  const scale = W > MAX ? MAX / W : 1;
+  const dw = Math.round(W * scale);
+  const dh = Math.round(H * scale);
+
+  const cv = document.createElement('canvas');
+  cv.width = dw; cv.height = dh;
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0, dw, dh);
+  const idata = cx.getImageData(0, 0, dw, dh);
+  const buf = idata.data.buffer.slice(0);
+
+  if (worker) worker.terminate();
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  worker = new Worker(URL.createObjectURL(blob));
+
+  const invS = 1 / scale;
+  worker.onmessage = e => {
+    const d = e.data;
+    if (d.type === 'progress') {
+      $pbar.style.width = d.pct + '%';
+      $pmsg.textContent = d.msg;
+    } else if (d.type === 'done') {
+      keys = d.keys.map(k => ({
+        x: Math.round(k.x * invS), y: Math.round(k.y * invS),
+        w: Math.round(k.w * invS), h: Math.round(k.h * invS),
+        cx: Math.round(k.cx * invS), cy: Math.round(k.cy * invS)
+      }));
+      texts = keys.map(() => '');
+      document.getElementById('stat').textContent =
+        `检测模式：${d.mode === 'alpha' ? '透明底实体提取' : '边缘检测'} | 原始：${W}×${H}`;
+      showMain();
+      worker.terminate();
+      worker = null;
+    }
+  };
+  worker.postMessage({ pixels: new Uint8Array(buf), w: dw, h: dh }, [buf]);
+}
+
+function showMain() {
+  $prog.style.display = 'none';
+  $main.style.display = 'block';
+  [$bgC, $hlC, $txC].forEach(c => { c.width = W; c.height = H; });
+  $bgC.getContext('2d').drawImage(img, 0, 0);
+  document.getElementById('infoCount').textContent = keys.length;
+  document.getElementById('kcnt').textContent = keys.length + ' 个';
+  buildInputs();
+  drawHL();
+  render();
+}
+
+// ================================================================
+// Key Inputs
+// ================================================================
+function buildInputs() {
+  $kgrid.innerHTML = '';
+  keys.forEach((k, i) => {
+    const d = document.createElement('div');
+    d.className = 'ki'; d.id = 'ki' + i;
+    d.innerHTML = `<div class="kn">#${i+1} (${k.w}×${k.h})</div>
+      <input type="text" maxlength="6" placeholder="输入" data-i="${i}">`;
+    const inp = d.querySelector('input');
+    inp.addEventListener('input', e => { texts[i] = e.target.value; render(); });
+    inp.addEventListener('focus', () => { activeIdx = i; setAct(i); drawHL(i); });
+    inp.addEventListener('blur', () => { activeIdx = -1; setAct(-1); drawHL(-1); });
+    $kgrid.appendChild(d);
+  });
+}
+
+function setAct(idx) {
+  document.querySelectorAll('.ki').forEach((el, i) => el.classList.toggle('active', i === idx));
+}
+
+// ================================================================
+// Highlights
+// ================================================================
+function drawHL(ai) {
+  const c = $hlC.getContext('2d');
+  c.clearRect(0, 0, W, H);
+  keys.forEach((k, i) => {
+    const on = i === ai;
+    c.save();
+    c.strokeStyle = on ? 'rgba(245,158,11,.9)' : 'rgba(129,140,248,.4)';
+    c.lineWidth = on ? Math.max(3, W * 0.003) : Math.max(1.5, W * 0.0015);
+    c.setLineDash(on ? [] : [Math.max(4, W*0.004), Math.max(3, W*0.003)]);
+    c.strokeRect(k.x, k.y, k.w, k.h);
+    c.restore();
+    const lw = Math.max(18, W * 0.02), lh = Math.max(13, W * 0.014);
+    c.fillStyle = on ? 'rgba(245,158,11,.85)' : 'rgba(129,140,248,.55)';
+    c.fillRect(k.x, k.y, lw, lh);
+    c.fillStyle = '#fff';
+    c.font = `${Math.max(9, W*0.009)}px sans-serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(i + 1, k.x + lw / 2, k.y + lh / 2);
+  });
+}
+
+// ================================================================
+// Render Text
+// ================================================================
+function render() {
+  const c = $txC.getContext('2d');
+  c.clearRect(0, 0, W, H);
+  const ox = +document.getElementById('ox').value || 0;
+  const oy = +document.getElementById('oy').value || 0;
+  const sz = +document.getElementById('fs').value || 10;
+  const co = document.getElementById('fc').value;
+  const wt = document.getElementById('fw').value;
+  const fm = document.getElementById('ff').value;
+
+  document.getElementById('xV').textContent = ox;
+  document.getElementById('yV').textContent = oy;
+  document.getElementById('fV').textContent = sz;
+
+  const ratio = W / 420;
+  const realSz = Math.round(sz * ratio);
+  const realOx = Math.round(ox * ratio);
+  const realOy = Math.round(oy * ratio);
+
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+
+  keys.forEach((k, i) => {
+    if (texts[i]) {
+      // Real text — full size, full opacity
+      c.font = `${wt} ${realSz}px ${fm}`;
+      c.fillStyle = co;
+      c.globalAlpha = 1;
+      c.fillText(texts[i], k.cx + realOx, k.cy + realOy);
+    } else {
+      // Placeholder — much smaller & faint
+      const placeSz = Math.max(6, Math.round(realSz * 0.4));
+      c.font = `normal ${placeSz}px ${fm}`;
+      c.fillStyle = co;
+      c.globalAlpha = 0.12;
+      c.fillText('·', k.cx + realOx, k.cy + realOy);
+    }
+  });
+  c.globalAlpha = 1;
+}
+
+// ================================================================
+// Controls
+// ================================================================
+['ox','oy','fs'].forEach(id => document.getElementById(id).addEventListener('input', render));
+['fc','fw','ff'].forEach(id => document.getElementById(id).addEventListener('change', render));
+function rst(id) { document.getElementById(id).value = 0; render(); }
+
+// ================================================================
+// ★★★ Font Import System ★★★
+// ================================================================
+const $fontFileIn = document.getElementById('fontFileIn');
+const $fontFileCard = document.getElementById('fontFileCard');
+const $fontUrlInput = document.getElementById('fontUrlInput');
+const $fontUrlBtn = document.getElementById('fontUrlBtn');
+const $fontNameInput = document.getElementById('fontNameInput');
+const $fontStatus = document.getElementById('fontStatus');
+const $fontList = document.getElementById('fontList');
+
+// --- File Upload ---
+$fontFileCard.addEventListener('click', () => $fontFileIn.click());
+$fontFileIn.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['ttf','otf','woff','woff2'].includes(ext)) {
+    showFontMsg('error', '不支持的格式，请上传 .ttf / .otf / .woff / .woff2');
+    return;
+  }
+  showFontMsg('loading', `正在加载 ${file.name}...`);
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    const userLabel = $fontNameInput.value.trim() || baseName;
+    loadFontFromBuffer(ev.target.result, userLabel);
+  };
+  reader.onerror = () => showFontMsg('error', '文件读取失败');
+  reader.readAsArrayBuffer(file);
+  $fontFileIn.value = '';
+});
+
+// --- URL Load ---
+$fontUrlBtn.addEventListener('click', loadFontFromURL);
+$fontUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadFontFromURL(); });
+
+async function loadFontFromURL() {
+  const url = $fontUrlInput.value.trim();
+  if (!url) return showFontMsg('error', '请输入字体 URL');
+
+  // Validate URL
+  try { new URL(url); } catch { return showFontMsg('error', '无效的 URL 地址'); }
+
+  $fontUrlBtn.disabled = true;
+  $fontUrlBtn.textContent = '加载中...';
+  showFontMsg('loading', `正在下载字体...`);
+
+  try {
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength < 100) throw new Error('文件太小，可能不是有效字体');
+    if (buf.byteLength > 50 * 1024 * 1024) throw new Error('文件超过 50MB 限制');
+
+    const urlName = url.split('/').pop().split('?')[0].replace(/\.[^.]+$/, '') || 'URLFont';
+    const userLabel = $fontNameInput.value.trim() || decodeURIComponent(urlName);
+    loadFontFromBuffer(buf, userLabel);
+    $fontUrlInput.value = '';
+  } catch (err) {
+    let msg = '字体加载失败：' + err.message;
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      msg += '（可能是跨域 CORS 限制，请确认服务器允许跨域访问）';
+    }
+    showFontMsg('error', msg);
+  } finally {
+    $fontUrlBtn.disabled = false;
+    $fontUrlBtn.textContent = '加载字体';
+  }
+}
+
+// --- Core: Load font from ArrayBuffer ---
+async function loadFontFromBuffer(buffer, userLabel) {
+  customFontCounter++;
+  const familyName = `CustomFont_${customFontCounter}`;
+  const displayName = userLabel || familyName;
+
+  try {
+    const ff = new FontFace(familyName, buffer);
+    const loadedFace = await ff.load();
+    document.fonts.add(loadedFace);
+
+    // Convert to base64 for persistence
+    const base64 = arrayBufferToBase64(buffer);
+
+    const fontEntry = {
+      id: customFontCounter,
+      name: displayName,
+      familyName: familyName,
+      fontFace: loadedFace,
+      base64: base64
+    };
+    customFonts.push(fontEntry);
+
+    // Save to localStorage
+    saveFontsToStorage();
+
+    // Add to <select>
+    addFontOption(fontEntry);
+    // Auto select the new font
+    $ff.value = `'${familyName}',sans-serif`;
+    render();
+
+    // Update UI
+    refreshFontList();
+    showFontMsg('success', `✅ "${displayName}" 加载成功！已自动选中并保存到本地。`);
+    $fontNameInput.value = '';
+  } catch (err) {
+    showFontMsg('error', `字体解析失败：${err.message}（文件可能已损坏或格式不兼容）`);
+  }
+}
+
+function addFontOption(entry) {
+  const opt = document.createElement('option');
+  opt.value = `'${entry.familyName}',sans-serif`;
+  opt.textContent = `✦ ${entry.name}`;
+  opt.dataset.customId = entry.id;
+  opt.style.color = '#818cf8';
+  $ff.appendChild(opt);
+}
+
+function refreshFontList() {
+  if (customFonts.length === 0) {
+    $fontList.innerHTML = '<span style="font-size:11px;color:#444">暂无自定义字体</span>';
+    return;
+  }
+  $fontList.innerHTML = '';
+  customFonts.forEach(f => {
+    const tag = document.createElement('span');
+    tag.className = 'font-tag';
+    tag.innerHTML = `
+      <span class="ft-preview" style="font-family:'${f.familyName}',sans-serif">Aa字</span>
+      <span class="ft-name" title="${f.name}">${f.name}</span>
+      <button class="ft-del" data-fid="${f.id}" title="删除">✕</button>
+    `;
+    tag.querySelector('.ft-del').addEventListener('click', () => removeFont(f.id));
+    $fontList.appendChild(tag);
+  });
+}
+
+function removeFont(id) {
+  const idx = customFonts.findIndex(f => f.id === id);
+  if (idx === -1) return;
+  const f = customFonts[idx];
+
+  // Remove from document.fonts
+  document.fonts.delete(f.fontFace);
+
+  // If currently selected, switch to default
+  const currentVal = $ff.value;
+  if (currentVal.includes(f.familyName)) {
+    $ff.value = 'sans-serif';
+    render();
+  }
+
+  // Remove <option>
+  const opts = $ff.querySelectorAll('option');
+  opts.forEach(o => { if (o.dataset.customId == id) o.remove(); });
+
+  customFonts.splice(idx, 1);
+
+  // Update localStorage
+  saveFontsToStorage();
+
+  refreshFontList();
+  showFontMsg('success', `已移除 "${f.name}"`);
+}
+
+function showFontMsg(type, msg) {
+  if (type === 'loading') {
+    $fontStatus.innerHTML = `<span class="font-loading"><span class="mini-spin"></span>${msg}</span>`;
+  } else if (type === 'error') {
+    $fontStatus.innerHTML = `<span class="font-err">❌ ${msg}</span>`;
+  } else {
+    $fontStatus.innerHTML = `<span style="font-size:12px;color:#6ee7b7">${msg}</span>`;
+  }
+  if (type !== 'loading') {
+    setTimeout(() => { $fontStatus.innerHTML = ''; }, 6000);
+  }
+}
+
+// ================================================================
+// Export
+// ================================================================
+document.getElementById('expA').addEventListener('click', () => xport(false));
+document.getElementById('expB').addEventListener('click', () => xport(true));
+
+function xport(withBg) {
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  if (withBg) c.drawImage(img, 0, 0);
+
+  const ox = +document.getElementById('ox').value || 0;
+  const oy = +document.getElementById('oy').value || 0;
+  const sz = +document.getElementById('fs').value || 10;
+  const co = document.getElementById('fc').value;
+  const wt = document.getElementById('fw').value;
+  const fm = document.getElementById('ff').value;
+  const ratio = W / 420;
+  const realSz = Math.round(sz * ratio);
+
+  c.fillStyle = co;
+  c.font = `${wt} ${realSz}px ${fm}`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+
+  keys.forEach((k, i) => {
+    if (texts[i]) c.fillText(texts[i], k.cx + Math.round(ox * ratio), k.cy + Math.round(oy * ratio));
+  });
+
+  const a = document.createElement('a');
+  a.download = withBg ? 'keyboard-preview.png' : 'text-layer.png';
+  a.href = cv.toDataURL('image/png');
+  a.click();
+}
+
+// ================================================================
+// Reset — preserves custom fonts
+// ================================================================
+document.getElementById('rstBtn').addEventListener('click', () => {
+  $main.style.display = 'none';
+  $up.style.display = '';
+  $fi.value = '';
+  keys = []; texts = [];
+  img = null;
+  ['ox','oy'].forEach(id => document.getElementById(id).value = 0);
+  document.getElementById('fs').value = 10;
+  // NOTE: custom fonts are NOT cleared — they persist across resets
+});
+
+// ================================================================
+// Init: restore saved fonts on page load
+// ================================================================
+loadFontsFromStorage();
+</script>
+</body>
+</html>
+
